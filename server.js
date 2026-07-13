@@ -111,7 +111,6 @@ app.get('/api/scan', async (req, res) => {
         discover: discoverScore,
       },
       manualChecks: {
-        publisherProfileUrl: `https://www.google.com/search?q=site:profile.google.com+${encodeURIComponent(domain)}`,
         knowledgeGraphUrl: `https://www.google.com/search?q=${encodeURIComponent(domain)}`,
       },
       generatedProfile: generateProfileLink(domain),
