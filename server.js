@@ -13,7 +13,7 @@ const {
 } = require('./lib/scoring');
 
 const app = express();
-app.use(cors()); // In produzione: restringi a app.use(cors({ origin: 'https://tuonegozio.myshopify.com' }))
+app.use(cors()); 'https://discover-method.myshopify.com'
 app.use(express.json());
 
 const TIMEOUT = 8000;
