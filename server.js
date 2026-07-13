@@ -13,7 +13,7 @@ const {
 } = require('./lib/scoring');
 const { generateProfileLink } = require('./lib/profileId');
 const { getDomainAge } = require('./lib/domainAge');
-const { checkRedditLinks } = require('./lib/redditLinks');
+const { getRedditCheckLink } = require('./lib/redditLinks');
 
 const app = express();
 app.use(cors()); // In produzione: restringi a app.use(cors({ origin: 'https://tuonegozio.myshopify.com' }))
@@ -55,14 +55,15 @@ app.get('/api/scan', async (req, res) => {
   const origin = `https://${domain}`;
 
   try {
-    const [robotsRes, llmsRes, homepageRes, sitemapResult, domainAge, redditLinks] = await Promise.all([
+    const [robotsRes, llmsRes, homepageRes, sitemapResult, domainAge] = await Promise.all([
       fetchText(`${origin}/robots.txt`),
       fetchText(`${origin}/llms.txt`),
       fetchText(origin),
       checkSitemaps(origin, TIMEOUT),
       getDomainAge(domain),
-      checkRedditLinks(domain),
     ]);
+
+    const redditLinks = getRedditCheckLink(domain);
 
     const robotsResult = robotsRes.ok ? parseRobots(robotsRes.data) : {};
     const robotsFound = robotsRes.ok;
@@ -97,7 +98,6 @@ app.get('/api/scan', async (req, res) => {
       llmsResult,
       htmlResult,
       sitemapResult,
-      redditLinks,
     });
 
     res.json({
