@@ -11,9 +11,10 @@ const {
   computeDiscoverScore,
   generateRecommendations,
 } = require('./lib/scoring');
+const { generateProfileLink } = require('./lib/profileId');
 
 const app = express();
-app.use(cors()); 'https://discover-method.myshopify.com'
+app.use(cors()); // In produzione: restringi a app.use(cors({ origin: 'https://tuonegozio.myshopify.com' }))
 app.use(express.json());
 
 const TIMEOUT = 8000;
@@ -113,11 +114,35 @@ app.get('/api/scan', async (req, res) => {
         publisherProfileUrl: `https://www.google.com/search?q=site:profile.google.com+${encodeURIComponent(domain)}`,
         knowledgeGraphUrl: `https://www.google.com/search?q=${encodeURIComponent(domain)}`,
       },
+      generatedProfile: generateProfileLink(domain),
       recommendations,
     });
   } catch (err) {
     res.status(500).json({ error: 'Errore durante la scansione.', detail: err.message });
   }
+});
+
+// Genera il link del profilo Google Discover per uno o più URL/domini.
+// GET  /api/profile-link?url=example.com
+// GET  /api/profile-link?url=example.com&url=repubblica.it   (URL multipli)
+// POST /api/profile-link  { "urls": ["example.com", "repubblica.it"] }
+app.get('/api/profile-link', (req, res) => {
+  const raw = req.query.url;
+  if (!raw) {
+    return res.status(400).json({ error: 'Parametro "url" mancante.' });
+  }
+  const urls = Array.isArray(raw) ? raw : [raw];
+  const results = urls.map((u) => generateProfileLink(u));
+  res.json(urls.length === 1 ? results[0] : results);
+});
+
+app.post('/api/profile-link', (req, res) => {
+  const urls = req.body?.urls;
+  if (!Array.isArray(urls) || urls.length === 0) {
+    return res.status(400).json({ error: 'Corpo JSON con campo "urls" (array) mancante o vuoto.' });
+  }
+  const results = urls.map((u) => generateProfileLink(u));
+  res.json(results);
 });
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
