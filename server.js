@@ -14,6 +14,8 @@ const {
 const { generateProfileLink } = require('./lib/profileId');
 const { getDomainAge } = require('./lib/domainAge');
 const { getRedditCheckLink } = require('./lib/redditLinks');
+const { getCoreWebVitals } = require('./lib/pagespeed');
+const { checkImageSize } = require('./lib/imageSize');
 
 const app = express();
 app.use(cors()); // In produzione: restringi a app.use(cors({ origin: 'https://tuonegozio.myshopify.com' }))
@@ -55,12 +57,13 @@ app.get('/api/scan', async (req, res) => {
   const origin = `https://${domain}`;
 
   try {
-    const [robotsRes, llmsRes, homepageRes, sitemapResult, domainAge] = await Promise.all([
+    const [robotsRes, llmsRes, homepageRes, sitemapResult, domainAge, coreWebVitals] = await Promise.all([
       fetchText(`${origin}/robots.txt`),
       fetchText(`${origin}/llms.txt`),
       fetchText(origin),
       checkSitemaps(origin, TIMEOUT),
       getDomainAge(domain),
+      getCoreWebVitals(origin),
     ]);
 
     const redditLinks = getRedditCheckLink(domain);
@@ -74,7 +77,20 @@ app.get('/api/scan', async (req, res) => {
 
     const htmlResult = homepageRes.ok
       ? scanHtml(homepageRes.data, origin)
-      : { organization: null, og: {}, twitter: {}, canonical: null, rssHref: null };
+      : {
+          organization: null,
+          article: null,
+          og: {},
+          twitter: {},
+          canonical: null,
+          rssHref: null,
+          maxImagePreviewLarge: false,
+          noImageIndex: false,
+          isMobileFriendly: false,
+        };
+
+    // Dipende da htmlResult.og.image, quindi va eseguito dopo lo scan HTML
+    const imageSize = await checkImageSize(htmlResult.og?.image);
 
     const publisherProfileStatus = (req.query.publisherProfile || 'unknown').toString();
 
@@ -91,6 +107,8 @@ app.get('/api/scan', async (req, res) => {
       htmlResult,
       sitemapResult,
       publisherProfileStatus,
+      coreWebVitals,
+      imageSize,
     });
 
     const recommendations = generateRecommendations({
@@ -98,6 +116,7 @@ app.get('/api/scan', async (req, res) => {
       llmsResult,
       htmlResult,
       sitemapResult,
+      coreWebVitals,
     });
 
     res.json({
@@ -106,11 +125,19 @@ app.get('/api/scan', async (req, res) => {
       robots: { found: robotsFound, bots: robotsResult },
       llms: llmsResult,
       organization: htmlResult.organization,
+      article: htmlResult.article,
       openGraph: htmlResult.og,
       twitter: htmlResult.twitter,
       canonical: htmlResult.canonical,
       rssFeed: Boolean(htmlResult.rssHref),
       sitemaps: sitemapResult,
+      discoverImageReadiness: {
+        maxImagePreviewLarge: htmlResult.maxImagePreviewLarge,
+        noImageIndex: htmlResult.noImageIndex,
+        image: imageSize,
+      },
+      isMobileFriendly: htmlResult.isMobileFriendly,
+      coreWebVitals,
       scores: {
         aiReadiness: aiReadinessScore,
         discover: discoverScore,
