@@ -12,6 +12,7 @@ const {
   generateRecommendations,
 } = require('./lib/scoring');
 const { generateProfileLink } = require('./lib/profileId');
+const { getDomainAge } = require('./lib/domainAge');
 
 const app = express();
 app.use(cors()); // In produzione: restringi a app.use(cors({ origin: 'https://tuonegozio.myshopify.com' }))
@@ -53,11 +54,12 @@ app.get('/api/scan', async (req, res) => {
   const origin = `https://${domain}`;
 
   try {
-    const [robotsRes, llmsRes, homepageRes, sitemapResult] = await Promise.all([
+    const [robotsRes, llmsRes, homepageRes, sitemapResult, domainAge] = await Promise.all([
       fetchText(`${origin}/robots.txt`),
       fetchText(`${origin}/llms.txt`),
       fetchText(origin),
       checkSitemaps(origin, TIMEOUT),
+      getDomainAge(domain),
     ]);
 
     const robotsResult = robotsRes.ok ? parseRobots(robotsRes.data) : {};
@@ -114,6 +116,7 @@ app.get('/api/scan', async (req, res) => {
         knowledgeGraphUrl: `https://www.google.com/search?q=${encodeURIComponent(domain)}`,
       },
       generatedProfile: generateProfileLink(domain),
+      domainAge,
       recommendations,
     });
   } catch (err) {
