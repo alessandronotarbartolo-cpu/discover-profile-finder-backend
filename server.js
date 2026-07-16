@@ -17,6 +17,7 @@ const { getRedditCheckLink } = require('./lib/redditLinks');
 const { getCoreWebVitals } = require('./lib/pagespeed');
 const { checkImageSize } = require('./lib/imageSize');
 const { getAuthorInsights } = require('./lib/authorInsights');
+const { probeRssFeed } = require('./lib/rssProbe');
 
 const app = express();
 app.use(cors()); // In produzione: restringi a app.use(cors({ origin: 'https://tuonegozio.myshopify.com' }))
@@ -88,7 +89,11 @@ app.get('/api/scan', async (req, res) => {
     // parallelo con le altre chiamate già in volo, non dopo di esse.
     const imageSizePromise = checkImageSize(htmlResult.og?.image);
 
-    const [robotsRes, llmsRes, sitemapResult, domainAge, coreWebVitals, imageSize, authorInsights] = await Promise.all([
+    // Se il tag <link> non dichiara un feed, proviamo a verificare se ne
+    // esiste comunque uno funzionante su un path comune (non dichiarato).
+    const rssProbePromise = htmlResult.rssHref ? Promise.resolve(null) : probeRssFeed(origin);
+
+    const [robotsRes, llmsRes, sitemapResult, domainAge, coreWebVitals, imageSize, authorInsights, undeclaredRssUrl] = await Promise.all([
       robotsPromise,
       llmsPromise,
       sitemapPromise,
@@ -96,9 +101,11 @@ app.get('/api/scan', async (req, res) => {
       coreWebVitalsPromise,
       imageSizePromise,
       authorInsightsPromise,
+      rssProbePromise,
     ]);
 
     const redditLinks = getRedditCheckLink(domain);
+    htmlResult.undeclaredRssUrl = undeclaredRssUrl;
 
     const robotsResult = robotsRes.ok ? parseRobots(robotsRes.data) : {};
     const robotsFound = robotsRes.ok;
@@ -145,7 +152,11 @@ app.get('/api/scan', async (req, res) => {
       openGraph: htmlResult.og,
       twitter: htmlResult.twitter,
       canonical: htmlResult.canonical,
-      rssFeed: Boolean(htmlResult.rssHref),
+      rssFeed: {
+        declared: Boolean(htmlResult.rssHref),
+        declaredUrl: htmlResult.rssHref || null,
+        undeclaredUrl: undeclaredRssUrl || null,
+      },
       sitemaps: sitemapResult,
       discoverImageReadiness: {
         maxImagePreviewLarge: htmlResult.maxImagePreviewLarge,
