@@ -132,6 +132,7 @@ app.get('/api/scan', async (req, res) => {
       htmlResult,
       sitemapResult,
       coreWebVitals,
+      authorInsights,
     });
 
     res.json({
