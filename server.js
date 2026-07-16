@@ -16,6 +16,7 @@ const { getDomainAge } = require('./lib/domainAge');
 const { getRedditCheckLink } = require('./lib/redditLinks');
 const { getCoreWebVitals } = require('./lib/pagespeed');
 const { checkImageSize } = require('./lib/imageSize');
+const { getAuthorInsights } = require('./lib/authorInsights');
 
 const app = express();
 app.use(cors()); // In produzione: restringi a app.use(cors({ origin: 'https://tuonegozio.myshopify.com' }))
@@ -65,6 +66,7 @@ app.get('/api/scan', async (req, res) => {
     const sitemapPromise = checkSitemaps(origin, 2500);
     const domainAgePromise = getDomainAge(domain);
     const coreWebVitalsPromise = getCoreWebVitals(origin);
+    const authorInsightsPromise = getAuthorInsights(origin, domain);
 
     const homepageRes = await fetchText(origin);
 
@@ -86,13 +88,14 @@ app.get('/api/scan', async (req, res) => {
     // parallelo con le altre chiamate già in volo, non dopo di esse.
     const imageSizePromise = checkImageSize(htmlResult.og?.image);
 
-    const [robotsRes, llmsRes, sitemapResult, domainAge, coreWebVitals, imageSize] = await Promise.all([
+    const [robotsRes, llmsRes, sitemapResult, domainAge, coreWebVitals, imageSize, authorInsights] = await Promise.all([
       robotsPromise,
       llmsPromise,
       sitemapPromise,
       domainAgePromise,
       coreWebVitalsPromise,
       imageSizePromise,
+      authorInsightsPromise,
     ]);
 
     const redditLinks = getRedditCheckLink(domain);
@@ -160,6 +163,7 @@ app.get('/api/scan', async (req, res) => {
       generatedProfile: generateProfileLink(domain),
       domainAge,
       redditLinks,
+      authorInsights,
       recommendations,
     });
   } catch (err) {
